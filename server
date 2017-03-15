@@ -1,0 +1,110 @@
+#pragma comment(lib,"Ws2_32.lib")
+#include <pthread.h>
+#include <WinSock2.h>
+#include <stdio.h>
+#include <conio.h>
+#include <Windows.h>
+
+#define SERVERPORT 666
+#define PRINTNUSERS if (nclients)\
+  printf("%d users on-line\n",nclients);\
+  else printf("No User on line\n");
+void *AnswerToClient(void *tid);
+  int nclients = 0;
+  SOCKET mas[10];
+  pthread_t thread[10];
+
+
+int main(int argc, char *argv[]){
+	WSADATA wsadata;
+	int res;
+        res = WSAStartup(0x0202, &wsadata);
+        printf("WSAStartup 1 times:%d\n", res);
+
+        if (res != 0) {
+            printf("WSAStartup error:%d\n", WSAGetLastError());
+			WSACleanup();
+            exit(1);
+        }
+	SOCKET sock=socket(AF_INET,SOCK_STREAM,0);
+	if(sock==INVALID_SOCKET) printf("Error at creating socket\n");
+	else printf("socket is successful created\n");
+	sockaddr_in my_addr;
+	my_addr.sin_family=AF_INET;
+    my_addr.sin_addr.s_addr=INADDR_ANY;
+	my_addr.sin_port=htons(SERVERPORT);
+	if (bind(sock,(sockaddr *) &my_addr,
+                sizeof(my_addr)))
+    {
+      // Ошибка
+      printf("Error bind %d\n",WSAGetLastError());
+      closesocket(sock);  // закрываем сокет!
+      WSACleanup();
+      return -1;
+    }
+	 if (listen(sock, 0x100))
+    {
+      // Ошибка
+      printf("Error listen %d\n",WSAGetLastError());
+      closesocket(sock);
+      WSACleanup();
+      return -1;
+    }
+
+    printf("Waiting for connections\n");
+	SOCKET client_socket;    // сокет для клиента
+    sockaddr_in client_addr;    // адрес клиента
+              // (заполняется системой)
+    // функции accept необходимо передать размер
+    // структуры
+    int client_addr_size=sizeof(client_addr);
+	// цикл извлечения запросов на подключение из
+    // очереди
+    while((client_socket=accept(sock, (sockaddr *)
+            &client_addr, &client_addr_size)))
+    {
+		mas[nclients]=client_socket;
+            // увеличиваем счетчик
+              // подключившихся клиентов
+	  
+      // пытаемся получить имя хоста
+      HOSTENT *hst;
+      hst=gethostbyaddr((char *)
+          &client_addr.sin_addr.s_addr,4, AF_INET);
+      // вывод сведений о клиенте
+      printf("+%s [%s] new connect!\n",
+      (hst)?hst->h_name:"",
+      inet_ntoa(client_addr.sin_addr));
+      
+	  int i = nclients;
+	  nclients++;
+	  PRINTNUSERS
+
+	  pthread_create(&thread[i], NULL, AnswerToClient, (void *)i);
+	  if(client_socket==SOCKET_ERROR)return -1;
+    }
+    return 0;
+  }
+  void *AnswerToClient(void *tid)
+  {
+	  SOCKET cl_sock;
+	  int s = nclients - 1;
+	  cl_sock = mas[s];
+	  char buff[20 * 1024];
+#define sHELLO "You are in chat"
+
+	  // отправляем клиенту приветствие 
+	  send(cl_sock, sHELLO, sizeof(sHELLO), 0);
+	  while (recv(cl_sock, &buff[0], sizeof(buff), 0) != SOCKET_ERROR) {
+		  for (int i = 0; i<nclients; i++) {
+			  if (mas[i] != cl_sock)
+				  send(mas[i], &buff[0], strlen(buff), 0);
+			  printf("%s\n", buff);
+		  }
+	  }
+	  nclients--;
+	  printf("-disconnect\n"); PRINTNUSERS
+		  closesocket(cl_sock);
+	  pthread_exit(NULL);
+	  return 0;
+  }
