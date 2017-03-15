@@ -44,7 +44,7 @@ int main(int argc, char *argv[]){
       // выводим на экран 
       printf("Server=>%s : %s\n",client.name,buff);
       // читаем пользовательский ввод с клавиатуры
-      printf(" %s =>Server:",client.name); fgets(&buff[0],sizeof(buff),
+      printf(" %s :",client.name); fgets(&buff[0],sizeof(buff),
              stdin);
       if (!strcmp(&buff[0],"leave\n"))
       {
