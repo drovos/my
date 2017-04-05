@@ -1,67 +1,58 @@
-#pragma comment(lib,"Ws2_32.lib")
-#include <WS2tcpip.h>
-#include <WinSock2.h>
+#include <iostream>
 #include <stdio.h>
-#include <conio.h>
-#include <Windows.h>
-#define PORT 666
-#define SERVERADDR "127.0.0.1"
+#pragma comment(lib,"ws2_32.lib")
+#include <WinSock2.h>
+#include <string>
 
-int main(int argc, char *argv[]){
-	WSADATA wsadata;
-	struct Client
+SOCKET Connection;
+void ClientThread()
+{
+	char buff[256];
+	while(recv(Connection,buff,sizeof(buff),NULL)!=SOCKET_ERROR)
 	{
-		char name[32];
-		SOCKET CSocket;
-	};
-	int res;
-	char buff[1024];
-        res = WSAStartup(0x0202, &wsadata);
-        printf("WSAStartup 1 times:%d\n", res);
+		printf("%s\n",buff);
+	}
+	closesocket(Connection);
+	WSACleanup();
+	ExitThread(NULL);
+	exit(0);
+}
 
-        if (res != 0) {
-            printf("WSAStartup error:%d\n", WSAGetLastError());
-            exit(1);
-        }
-		Client client;
-		client.CSocket=socket(AF_INET,SOCK_STREAM,0);
-	
-	if(client.CSocket==INVALID_SOCKET) printf("Error at creating socket\n");
-	else printf("socket is successful created\n");
-	sockaddr_in dest;
-	dest.sin_family=AF_INET;
-    dest.sin_addr.s_addr=inet_addr(SERVERADDR);
-	dest.sin_port=htons(PORT);
-	printf("Input ur nickname= ");gets(client.name);
-	if(SOCKET_ERROR==connect( client.CSocket, ( struct sockaddr* )&dest, sizeof(dest)))
+
+
+
+int main()
+{
+	WSAData wsaData;
+	WORD Version=MAKEWORD(2,1);
+	if(WSAStartup(Version,&wsaData)!=0)
 	{
-		printf("Connection error:%d\n", WSAGetLastError());
+		printf("Winsock startup failed");
 		exit(1);
-	} else printf("Connection with %s is successful\n\
-    Type 'leave' for quit\n\n",SERVERADDR);
-    while((recv(client.CSocket,&buff[0],sizeof(buff),0))!=SOCKET_ERROR)
-    {
-      // выводим на экран 
-      printf("Server=>%s : %s\n",client.name,buff);
-      // читаем пользовательский ввод с клавиатуры
-      printf(" %s :",client.name); fgets(&buff[0],sizeof(buff),
-             stdin);
-      if (!strcmp(&buff[0],"leave\n"))
-      {
-        printf("Exit...");
-        closesocket(client.CSocket);
-        WSACleanup();
-        return 0;
-      }
+	}
+	SOCKADDR_IN addr;
+	int addrlen=sizeof(addr);
+	addr.sin_addr.s_addr=inet_addr("127.0.0.1");
+	addr.sin_port=htons(666);
+	addr.sin_family=AF_INET;
 
-      // передаем строку клиента серверу
-	  printf("Sending :%s\n",buff);
-      send(client.CSocket,&buff[0],sizeof(buff),MSG_DONTROUTE);
-	  
-    }
+	Connection = socket(AF_INET,SOCK_STREAM,NULL);
+	if(connect(Connection,(SOCKADDR*)&addr,addrlen)!=0)
+	{
+		MessageBoxA(NULL,"Failed to connect", "Error", MB_OK |  MB_ICONERROR);
+		return 0;
+	}
+	printf("Connected\n");
+	CreateThread(NULL,NULL,(LPTHREAD_START_ROUTINE)ClientThread,NULL,NULL,NULL);
 
-    printf("Recv error %d\n",WSAGetLastError());
-    closesocket(client.CSocket);
-    WSACleanup();
-    return -1;
-  }
+	char buff[256];
+	while(true)
+	{
+		gets(buff);
+		send(Connection,buff,sizeof(buff),NULL);
+		
+		Sleep(10);
+	}
+	system("pause");
+	return 0;
+}
